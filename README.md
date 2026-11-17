@@ -2,7 +2,7 @@
 
 A complete temporary-worker payroll web app based on the 11 SmartPayroll modules in the supplied proposal. The standalone application lives at the root of https://github.com/bxd03/smart-payroll.
 
-Live: https://smartpayroll-badariah.greyapex8.chatgpt.site
+Live: https://smartpayroll.greyapex8.chatgpt.site
 
 ## Modules
 

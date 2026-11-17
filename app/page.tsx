@@ -1172,35 +1172,79 @@ function WorkerPunchRow({ worker: w, record: a, workDate }: any) {
         {w.deletedAt ? (
           <span>—</span>
         ) : (
-          <select
-            className="rowSelect"
-            aria-label={"Assigned shift for " + w.name}
-            disabled={busy}
-            value={w.shiftId}
-            onChange={(e) =>
-              act(
-                "saveEntity",
-                {
-                  entity: "workers",
-                  value: {
-                    ...w,
-                    shiftId: e.target.value,
-                    siteId:
-                      shifts.find((s: any) => s.id === e.target.value)
-                        ?.siteId || w.siteId,
+          <div>
+            <select
+              className="rowSelect"
+              aria-label={"Time entry mode for " + w.name}
+              disabled={busy}
+              value={w.shiftId ? "assigned" : "manual"}
+              onChange={(e) => {
+                const shift = e.target.value === "assigned" ? shifts[0] : null;
+                act(
+                  "saveEntity",
+                  {
+                    entity: "workers",
+                    value: {
+                      ...w,
+                      shiftId: shift?.id || "",
+                      siteId: shift?.siteId || w.siteId,
+                    },
                   },
-                },
-                "Shift assignment saved",
-              )
-            }
-          >
-            <option value="">Manual times / no shift</option>
-            {shifts.map((s: any) => (
-              <option key={s.id} value={s.id}>
-                {s.name} · {s.start}–{s.end}
+                  "Time entry mode saved",
+                );
+              }}
+            >
+              <option value="assigned" disabled={!shifts.length}>
+                Assigned shift
               </option>
-            ))}
-          </select>
+              <option value="manual">Manually entered</option>
+            </select>
+            {w.shiftId ? (
+              <select
+                className="rowSelect"
+                aria-label={"Assigned shift for " + w.name}
+                disabled={busy}
+                value={w.shiftId}
+                onChange={(e) =>
+                  act(
+                    "saveEntity",
+                    {
+                      entity: "workers",
+                      value: {
+                        ...w,
+                        shiftId: e.target.value,
+                        siteId:
+                          shifts.find((s: any) => s.id === e.target.value)
+                            ?.siteId || w.siteId,
+                      },
+                    },
+                    "Shift assignment saved",
+                  )
+                }
+              >
+                {!shifts.some((s: any) => s.id === w.shiftId) && (
+                  <option value={w.shiftId}>
+                    {state.shifts.find((s: any) => s.id === w.shiftId)?.name ||
+                      "Previous shift"}{" "}
+                    (inactive)
+                  </option>
+                )}
+                {shifts.map((s: any) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} · {s.start}–{s.end}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <small>Enter punch in and punch out directly.</small>
+            )}
+            {a && a.shiftId !== w.shiftId && (
+              <small>
+                Assignment applies to new records. This date keeps its saved
+                shift.
+              </small>
+            )}
+          </div>
         )}
         {!w.deletedAt && sh && !locked && (
           <Button
