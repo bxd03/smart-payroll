@@ -109,6 +109,8 @@ const groups = [
   },
 ];
 const desc: any = {
+  "All workspaces":
+    "Superadmin access to database records, uploaded documents, and audit history.",
   Overview:
     "Your temporary workforce. Every hour, every company, every payday.",
   "Companies & properties":
@@ -152,15 +154,26 @@ export default function App() {
     [modal, setModal] = useState<any>(null),
     [mobile, setMobile] = useState(false),
     [selectedRun, setSelectedRun] = useState(""),
+    [activeWorkspace, setActiveWorkspace] = useState(""),
+    [workspaceItems, setWorkspaceItems] = useState<any[]>([]),
     [workspace, setWorkspace] = useState<any>({
       signedIn: false,
       name: "Guest workspace",
     });
-  async function load() {
+  const apiUrl = (path: string, target = activeWorkspace) =>
+    target
+      ? path +
+        (path.includes("?") ? "&" : "?") +
+        "workspace=" +
+        encodeURIComponent(target)
+      : path;
+  async function load(target = activeWorkspace) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/state", { cache: "no-store" }),
+      const res = await fetch(apiUrl("/api/state", target), {
+          cache: "no-store",
+        }),
         r: any = await res.json();
       if (!res.ok) throw Error(r.error);
       setState(r.data);
@@ -168,6 +181,13 @@ export default function App() {
       setRevision(r.revision);
       setFiles(r.files);
       setAudit(r.audit);
+      if (r.workspace?.isSuperadmin) {
+        const res = await fetch("/api/admin/workspaces", { cache: "no-store" });
+        if (res.ok) {
+          const list: any = await res.json();
+          setWorkspaceItems(list.items);
+        }
+      }
     } catch (e: any) {
       setError(e.message || "Unable to load workspace");
     } finally {
@@ -191,7 +211,7 @@ export default function App() {
     setBusy(true);
     setError("");
     try {
-      const res = await fetch("/api/state", {
+      const res = await fetch(apiUrl("/api/state"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, payload, revision }),
@@ -223,6 +243,18 @@ export default function App() {
     list.filter((x) => !companyId || x.companyId === companyId);
   const ctx = {
     state,
+    apiUrl,
+    workspace,
+    workspaceItems,
+    activeWorkspace,
+    switchWorkspace: (key: string) => {
+      if (busy) return;
+      setActiveWorkspace(key);
+      setCompanyId("");
+      setSelectedRun("");
+      setModal(null);
+      load(key);
+    },
     act,
     files,
     setFiles,
@@ -365,7 +397,7 @@ export default function App() {
               <button
                 className="iconBtn"
                 aria-label="Reload workspace"
-                onClick={load}
+                onClick={() => load()}
                 disabled={busy}
               >
                 <RefreshCw size={16} />
@@ -417,11 +449,46 @@ export default function App() {
                 </label>
               </div>
             </div>
+            {workspace.isSuperadmin && (
+              <div className="superadminBar">
+                <ShieldCheck size={20} />
+                <div>
+                  <b>Superadmin · Access all workspaces</b>
+                  <small>
+                    Choose a workspace to view and manage its records.
+                  </small>
+                </div>
+                <select
+                  aria-label="Superadmin workspace"
+                  value={activeWorkspace}
+                  disabled={busy || loading}
+                  onChange={(e) => ctx.switchWorkspace(e.target.value)}
+                >
+                  <option value="">Your original workspace</option>
+                  {workspaceItems
+                    .filter(
+                      (w: any) =>
+                        w.version === 2 && w.key !== "smartpayroll-v2",
+                    )
+                    .map((w: any) => (
+                      <option key={w.key} value={w.key}>
+                        {w.label} · {w.workers} workers
+                      </option>
+                    ))}
+                </select>
+                <button
+                  className="btn secondary"
+                  onClick={() => navigate("All workspaces")}
+                >
+                  All data
+                </button>
+              </div>
+            )}
             {!workspace.signedIn && (
               <div className="guestNote">
-                Guest workspace · Records are linked to this browser. Keep
-                cookies to return to them. Signing in opens a separate account
-                workspace.
+                Guest workspace · The workspace owner can administer stored
+                records. Keep cookies to return to them. Signing in opens a
+                separate account workspace.
               </div>
             )}
             {error && (
@@ -455,6 +522,9 @@ export default function App() {
             ) : (
               <>
                 {page === "Overview" && <Overview />}
+                {page === "All workspaces" && workspace.isSuperadmin && (
+                  <AllWorkspaces />
+                )}
                 {page === "Companies & properties" && <Companies />}
                 {page === "Temporary workers" && <Workers />}
                 {page === "Shift management" && <Shifts />}
@@ -481,7 +551,15 @@ export default function App() {
             </footer>
           </div>
         </main>
-        {modal && <Editor />}
+        {modal && (
+          <Editor
+            key={
+              modal.kind +
+              ":" +
+              (modal.value?.id || modal.value?.workerId || "new")
+            }
+          />
+        )}
         {toast && (
           <div className="toast" role="status">
             <CheckCircle2 size={18} />
@@ -890,19 +968,83 @@ function Companies() {
     </>
   );
 }
+function AllWorkspaces() {
+  const { workspaceItems, switchWorkspace, navigate, activeWorkspace } =
+    useApp();
+  return (
+    <Card
+      title="Superadmin · All stored data"
+      description="View any current workspace, or export a complete database record with file metadata and audit history."
+    >
+      <Table
+        headers={[
+          "Workspace",
+          "Companies",
+          "Workers",
+          "Attendance",
+          "Payroll runs",
+          "Actions",
+        ]}
+        empty={!workspaceItems.length}
+      >
+        {workspaceItems.map((w: any) => (
+          <tr key={w.key}>
+            <td>
+              <b>{w.label}</b>
+              <small>
+                {w.version === 2 ? "Current workspace" : "Legacy data"}
+              </small>
+            </td>
+            <td>{w.companies}</td>
+            <td>{w.workers}</td>
+            <td>{w.attendance}</td>
+            <td>{w.payroll}</td>
+            <td>
+              <div className="buttonRow">
+                {w.version === 2 && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      switchWorkspace(w.key === "smartpayroll-v2" ? "" : w.key);
+                      navigate("Overview");
+                    }}
+                  >
+                    Open workspace
+                  </Button>
+                )}
+                <a
+                  className="btn secondary"
+                  href={
+                    "/api/admin/export?workspace=" + encodeURIComponent(w.key)
+                  }
+                  download
+                >
+                  <Download size={14} /> Full export
+                </a>
+              </div>
+            </td>
+          </tr>
+        ))}
+      </Table>
+    </Card>
+  );
+}
 function Workers() {
   const { state, scoped, open } = useApp();
   const [query, setQuery] = useState(""),
-    [status, setStatus] = useState("");
+    [status, setStatus] = useState(""),
+    [workDate, setWorkDate] = useState(today());
   const rows = scoped(state.workers).filter(
     (w: any) =>
       (w.name + " " + w.code).toLowerCase().includes(query.toLowerCase()) &&
-      (!status || w.status === status),
+      (status === "Deleted"
+        ? !!w.deletedAt
+        : !w.deletedAt && (!status || w.status === status)),
   );
   return (
     <Card
       title="Your temporary workforce"
-      description="Rates and assignments apply to new attendance; saved records retain their original policy and rate."
+      description="Edit assignments and record punch times here. Without an assigned shift, complete punch times define a manual work interval."
       action={
         <Button
           disabled={!state.companies.length}
@@ -917,80 +1059,312 @@ function Workers() {
           <Search size={16} />
           <input
             aria-label="Search workers"
-            placeholder="Search worker name or ID…"
+            placeholder="Search name or worker ID…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
+        <label className="inlineDate">
+          Work date
+          <input
+            aria-label="Worker punch work date"
+            type="date"
+            value={workDate}
+            onChange={(e) => setWorkDate(e.target.value)}
+          />
+        </label>
         <select
           aria-label="Worker status"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
         >
-          <option value="">All statuses</option>
+          <option value="">Current workers</option>
           <option>Active</option>
           <option>Inactive</option>
+          <option>Deleted</option>
         </select>
         <span>{rows.length} workers</span>
       </div>
       <Table
         headers={[
           "Worker",
-          "Company & property",
+          "Company / rate",
           "Assigned shift",
-          "Hourly rate",
-          "Payment",
-          "Status",
-          "",
+          "Punch in",
+          "Punch out",
+          "Break",
+          "Record",
+          "Actions",
         ]}
         empty={!rows.length}
       >
-        {rows.map((w: any) => (
-          <tr key={w.id}>
-            <td>
-              <Person name={w.name} code={w.code} />
-            </td>
-            <td>
-              {state.companies.find((c: any) => c.id === w.companyId)?.name}
-              <small>
-                {state.sites.find((p: any) => p.id === w.siteId)?.name ||
-                  "Unassigned property"}
-              </small>
-            </td>
-            <td>
-              {state.shifts.find((s: any) => s.id === w.shiftId)?.name ||
-                "Unassigned"}
-            </td>
-            <td>
-              <b>{money(w.rate)}</b>
-              <small>per hour</small>
-            </td>
-            <td>
-              {w.paymentMethod}
-              <small>
-                {w.bank} {w.account ? "•••• " + w.account.slice(-4) : ""}
-              </small>
-            </td>
-            <td>
-              <Badge tone={w.status === "Active" ? "green" : "gray"}>
-                {w.status}
-              </Badge>
-            </td>
-            <td>
-              <Button
-                variant="icon"
-                aria-label={"Edit " + w.name}
-                onClick={() => open("workers", w)}
-              >
-                <Pencil size={15} />
-              </Button>
-            </td>
-          </tr>
-        ))}
+        {rows.map((w: any) => {
+          const a = state.attendance.find(
+            (a: any) => a.workerId === w.id && a.date === workDate,
+          );
+          return (
+            <WorkerPunchRow
+              key={w.id + workDate + (a?.updatedAt || "")}
+              worker={w}
+              record={a}
+              workDate={workDate}
+            />
+          );
+        })}
       </Table>
     </Card>
   );
 }
+function WorkerPunchRow({ worker: w, record: a, workDate }: any) {
+  const { state, act, open, busy } = useApp();
+  const [cin, setCin] = useState(a?.clockIn || ""),
+    [cout, setCout] = useState(a?.clockOut || ""),
+    [breakMinutes, setBreak] = useState(
+      a?.breakMinutes ??
+        state.shifts.find((s: any) => s.id === w.shiftId)?.breakMinutes ??
+        0,
+    );
+  const locked = !!a && isLocked(state, a);
+  const shifts = state.shifts.filter(
+    (s: any) => s.companyId === w.companyId && s.status === "Active",
+  );
+  const sh = state.shifts.find(
+    (s: any) => s.id === (a ? a.shiftId : w.shiftId),
+  );
+  async function save() {
+    await act(
+      "saveEntity",
+      {
+        entity: "attendance",
+        value: {
+          ...a,
+          id: a?.id || crypto.randomUUID(),
+          companyId: w.companyId,
+          siteId: a?.siteId || sh?.siteId || w.siteId,
+          workerId: w.id,
+          shiftId: a ? a.shiftId : w.shiftId,
+          date: workDate,
+          clockIn: cin,
+          clockOut: cout,
+          breakMinutes,
+          rate: a?.rate ?? w.rate,
+          notes: a?.notes || "Entered directly from worker list",
+          reviewNote: a?.reviewNote || "",
+          sourceId: a?.sourceId || "",
+          shiftStart: sh ? a?.shiftStart || sh.start : cin,
+          shiftEnd: sh ? a?.shiftEnd || sh.end : cout,
+        },
+      },
+      "Punch times saved",
+    );
+  }
+  return (
+    <tr>
+      <td>
+        <Person name={w.name} code={w.code} />
+        <small>{w.deletedAt ? "Deleted" : w.status}</small>
+      </td>
+      <td>
+        {state.companies.find((c: any) => c.id === w.companyId)?.name}
+        <small>{money(w.rate)} / hour</small>
+      </td>
+      <td>
+        {w.deletedAt ? (
+          <span>—</span>
+        ) : (
+          <select
+            className="rowSelect"
+            aria-label={"Assigned shift for " + w.name}
+            disabled={busy}
+            value={w.shiftId}
+            onChange={(e) =>
+              act(
+                "saveEntity",
+                {
+                  entity: "workers",
+                  value: {
+                    ...w,
+                    shiftId: e.target.value,
+                    siteId:
+                      shifts.find((s: any) => s.id === e.target.value)
+                        ?.siteId || w.siteId,
+                  },
+                },
+                "Shift assignment saved",
+              )
+            }
+          >
+            <option value="">Manual times / no shift</option>
+            {shifts.map((s: any) => (
+              <option key={s.id} value={s.id}>
+                {s.name} · {s.start}–{s.end}
+              </option>
+            ))}
+          </select>
+        )}
+        {!w.deletedAt && sh && !locked && (
+          <Button
+            variant="text"
+            onClick={() => {
+              setCin(sh.start);
+              setCout(sh.end);
+              setBreak(sh.breakMinutes);
+            }}
+          >
+            Use shift times
+          </Button>
+        )}
+      </td>
+      <td>
+        <input
+          className="rowTime"
+          aria-label={"Punch in for " + w.name}
+          type="time"
+          value={cin}
+          disabled={busy || locked || !!w.deletedAt}
+          onInput={(e) => setCin(e.currentTarget.value)}
+          onChange={(e) => setCin(e.target.value)}
+        />
+      </td>
+      <td>
+        <input
+          className="rowTime"
+          aria-label={"Punch out for " + w.name}
+          type="time"
+          value={cout}
+          disabled={busy || locked || !!w.deletedAt}
+          onInput={(e) => setCout(e.currentTarget.value)}
+          onChange={(e) => setCout(e.target.value)}
+        />
+      </td>
+      <td>
+        <input
+          className="rowBreak"
+          aria-label={"Break minutes for " + w.name}
+          type="number"
+          min={0}
+          max={720}
+          value={breakMinutes}
+          disabled={busy || locked || !!w.deletedAt}
+          onChange={(e) => setBreak(Number(e.target.value))}
+        />
+      </td>
+      <td>
+        {locked ? (
+          <Badge tone="gray">Payroll locked</Badge>
+        ) : (
+          !w.deletedAt && (
+            <Button
+              variant="secondary"
+              disabled={
+                busy || !workDate || (!cin && !cout) || (!sh && (!cin || !cout))
+              }
+              onClick={save}
+            >
+              Save times
+            </Button>
+          )
+        )}
+      </td>
+      <td>
+        <div className="buttonRow">
+          {w.deletedAt ? (
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={() =>
+                act("restoreWorker", { id: w.id }, "Worker restored")
+              }
+            >
+              Restore
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                aria-label={"Edit " + w.name}
+                onClick={() => open("workers", w)}
+              >
+                <Pencil size={14} /> Edit
+              </Button>
+              <Button
+                variant="dangerText"
+                aria-label={"Delete " + w.name}
+                onClick={() => open("deleteWorker", w)}
+              >
+                <Trash2 size={14} /> Delete
+              </Button>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+function AttendanceTimeInputs({ record: a }: any) {
+  const { act, busy } = useApp();
+  const [cin, setCin] = useState(a.clockIn),
+    [cout, setCout] = useState(a.clockOut);
+  const locked = isLocked(useApp().state, a),
+    dirty = cin !== a.clockIn || cout !== a.clockOut;
+  return (
+    <div className="attendanceTimeInputs">
+      <div>
+        <input
+          aria-label={"Clock in " + a.date + " " + a.id}
+          className="rowTime"
+          type="time"
+          value={cin}
+          disabled={busy || locked}
+          onInput={(e) => setCin(e.currentTarget.value)}
+          onChange={(e) => setCin(e.target.value)}
+        />
+        <span>→</span>
+        <input
+          aria-label={"Clock out " + a.date + " " + a.id}
+          className="rowTime"
+          type="time"
+          value={cout}
+          disabled={busy || locked}
+          onInput={(e) => setCout(e.currentTarget.value)}
+          onChange={(e) => setCout(e.target.value)}
+        />
+      </div>
+      {dirty && (
+        <Button
+          variant="secondary"
+          disabled={busy || locked}
+          onClick={() =>
+            act(
+              "saveEntity",
+              {
+                entity: "attendance",
+                value: {
+                  ...a,
+                  clockIn: cin,
+                  clockOut: cout,
+                  ...(!a.shiftId
+                    ? {
+                        shiftStart: cin || a.shiftStart,
+                        shiftEnd: cout || a.shiftEnd,
+                      }
+                    : {}),
+                },
+              },
+              "Clock times updated; original times retained",
+            )
+          }
+        >
+          Save clock times
+        </Button>
+      )}
+      <small>
+        {a.breakMinutes} min break{locked ? " · Finalized payroll" : ""}
+      </small>
+    </div>
+  );
+}
+
 function Shifts() {
   const { state, scoped, open } = useApp();
   const shifts = scoped(state.shifts);
@@ -1104,9 +1478,15 @@ function AttendanceTable({ rows, editable = false }: any) {
               </small>
             </td>
             <td className="mono">
-              {a.clockIn || "—"} <span className="arrow">→</span>{" "}
-              {a.clockOut || "—"}
-              <small>{a.breakMinutes} min break</small>
+              {editable ? (
+                <AttendanceTimeInputs key={a.id + a.updatedAt} record={a} />
+              ) : (
+                <>
+                  {a.clockIn || "—"} <span className="arrow">→</span>{" "}
+                  {a.clockOut || "—"}
+                  <small>{a.breakMinutes} min break</small>
+                </>
+              )}
             </td>
             <td className="mono">
               {clock(c.adjustedIn)} <span className="arrow">→</span>{" "}
@@ -1193,7 +1573,7 @@ function Attendance() {
               <Download size={15} /> Excel
             </Button>
             <Button
-              disabled={!state.workers.length || !state.shifts.length}
+              disabled={!state.workers.filter((w: any) => !w.deletedAt).length}
               onClick={() => open("attendance")}
             >
               <Plus size={16} /> Add attendance
@@ -1436,6 +1816,7 @@ function Hours() {
 function Scanner() {
   const {
     state,
+    apiUrl,
     companyId,
     act,
     busy,
@@ -1477,7 +1858,10 @@ function Scanner() {
       setProgress("Preserving original source…");
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch("/api/files", { method: "POST", body: form }),
+      const res = await fetch(apiUrl("/api/files"), {
+          method: "POST",
+          body: form,
+        }),
         saved: any = await res.json();
       if (!res.ok) throw Error(saved.error);
       setSourceId(saved.id);
@@ -1877,7 +2261,7 @@ function Scanner() {
               <td>
                 <a
                   className="btn secondary"
-                  href={"/api/files?id=" + encodeURIComponent(f.id)}
+                  href={apiUrl("/api/files?id=" + encodeURIComponent(f.id))}
                   download
                 >
                   <Download size={14} /> Original
@@ -2768,6 +3152,7 @@ function Audit() {
 function Editor() {
   const {
     state,
+    apiUrl,
     modal,
     setModal,
     open,
@@ -2843,7 +3228,8 @@ function Editor() {
       const w =
         state.workers.find((w: any) => w.id === value.workerId) ||
         state.workers.find(
-          (w: any) => w.companyId === companyId && w.status === "Active",
+          (w: any) =>
+            w.companyId === companyId && w.status === "Active" && !w.deletedAt,
         );
       const shift =
         state.shifts.find((s: any) => s.id === (value.shiftId || w?.shiftId)) ||
@@ -2856,6 +3242,8 @@ function Editor() {
         workerId: w?.id || "",
         siteId: value.siteId || shift?.siteId || w?.siteId || "",
         shiftId: shift?.id || "",
+        shiftStart: shift?.start || "07:30",
+        shiftEnd: shift?.end || "19:30",
         date: today(),
         clockIn: shift?.start || "",
         clockOut: shift?.end || "",
@@ -2921,6 +3309,10 @@ function Editor() {
         ].includes(key)
       }
       disabled={locked || busy}
+      onInput={(e: any) => {
+        if (type === "time" || type === "date")
+          update(key, e.currentTarget.value);
+      }}
       onChange={(e: any) =>
         update(key, type === "number" ? Number(e.target.value) : e.target.value)
       }
@@ -3065,6 +3457,12 @@ function Editor() {
       );
     if (kind === "clearDemo")
       r = await act("clearDemo", {}, "Sample workspace cleared");
+    if (kind === "deleteWorker")
+      r = await act(
+        "deleteWorker",
+        { id: f.id },
+        "Worker deleted; history retained",
+      );
     if (kind === "removeAttendance")
       r = await act("removeAttendance", { id: f.id }, "Attendance removed");
     if (r) setModal(null);
@@ -3088,18 +3486,27 @@ function Editor() {
     payRun: "Record a completed payment",
     clearDemo: "Clear the sample workspace?",
     removeAttendance: "Remove this attendance record?",
+    deleteWorker: "Delete this worker?",
   };
   let preview: any = null;
   if (kind === "attendance") {
     const sh = state.shifts.find((s: any) => s.id === f.shiftId),
       co = state.companies.find((c: any) => c.id === f.companyId);
-    if (sh && co)
+    if (co)
       preview = calculate({
         ...f,
-        shiftStart: f.shiftId === value.shiftId ? value.shiftStart : sh.start,
-        shiftEnd: f.shiftId === value.shiftId ? value.shiftEnd : sh.end,
+        shiftStart:
+          value.id && f.shiftId === value.shiftId
+            ? value.shiftStart
+            : sh?.start || f.shiftStart,
+        shiftEnd:
+          value.id && f.shiftId === value.shiftId
+            ? value.shiftEnd
+            : sh?.end || f.shiftEnd,
         policy:
-          f.shiftId === value.shiftId && f.companyId === value.companyId
+          value.id &&
+          f.shiftId === value.shiftId &&
+          f.companyId === value.companyId
             ? value.policy
             : co.policy,
       });
@@ -3252,7 +3659,11 @@ function Editor() {
               {select(
                 "Worker",
                 "workerId",
-                state.workers.filter((w: any) => w.companyId === f.companyId),
+                state.workers.filter(
+                  (w: any) =>
+                    w.companyId === f.companyId &&
+                    (!w.deletedAt || w.id === f.workerId),
+                ),
                 {
                   required: true,
                   onChange: (e: any) => {
@@ -3275,11 +3686,11 @@ function Editor() {
               )}
               {field("Work date (shift start date)", "date", "date")}
               {select(
-                "Shift",
+                "Shift (optional)",
                 "shiftId",
                 state.shifts.filter((s: any) => s.companyId === f.companyId),
                 {
-                  required: true,
+                  required: false,
                   onChange: (e: any) => {
                     const sh = state.shifts.find(
                       (s: any) => s.id === e.target.value,
@@ -3300,6 +3711,12 @@ function Editor() {
                 "Property (optional)",
                 "siteId",
                 state.sites.filter((p: any) => p.companyId === f.companyId),
+              )}
+              {!f.shiftId && (
+                <>
+                  {field("Manual shift start", "shiftStart", "time")}
+                  {field("Manual shift end", "shiftEnd", "time")}
+                </>
               )}
               {field("Actual clock-in", "clockIn", "time", { required: false })}
               {field("Actual clock-out", "clockOut", "time", {
@@ -3361,7 +3778,7 @@ function Editor() {
             {f.sourceId && (
               <a
                 className="btn secondary"
-                href={"/api/files?id=" + encodeURIComponent(f.sourceId)}
+                href={apiUrl("/api/files?id=" + encodeURIComponent(f.sourceId))}
                 download
               >
                 <Download size={14} /> Download original source
@@ -3495,6 +3912,13 @@ function Editor() {
             remain in the document archive.
           </p>
         )}
+        {kind === "deleteWorker" && (
+          <p className="confirmText">
+            Delete <b>{f.name}</b> from the active worker list? Historical
+            attendance and payroll are retained. You can restore the worker from
+            the Deleted workers filter.
+          </p>
+        )}
         {kind === "removeAttendance" && (
           <p className="confirmText">
             Remove this unfinalized attendance entry from the register? The
@@ -3533,6 +3957,7 @@ function Editor() {
                       : [
                             "clearDemo",
                             "removeAttendance",
+                            "deleteWorker",
                             "cancelRun",
                             "refreshRun",
                           ].includes(kind)

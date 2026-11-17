@@ -73,6 +73,7 @@ const schemas = {
     code: text.min(1),
     name: text.min(1),
     rate: amount.positive(),
+    deletedAt: text.optional(),
     phone: text,
     bank: text,
     account: text,
@@ -84,7 +85,9 @@ const schemas = {
     companyId: id,
     siteId: text,
     workerId: id,
-    shiftId: id,
+    shiftId: text,
+    shiftStart: time.optional(),
+    shiftEnd: time.optional(),
     date,
     clockIn: z.union([z.literal(""), time]),
     clockOut: z.union([z.literal(""), time]),
@@ -135,8 +138,15 @@ function attendance(s: Workspace, input: any, now: string): Attendance {
     (x) => x.id === v.workerId && x.companyId === v.companyId,
   );
   need(w, "Worker must belong to the selected company");
+  need(
+    !w.deletedAt || s.attendance.some((a) => a.id === v.id),
+    "Restore this deleted worker before adding attendance",
+  );
   const shift = s.shifts.find((x) => x.id === v.shiftId);
-  need(shift, "Choose a shift");
+  need(
+    shift || (v.shiftStart && v.shiftEnd && v.shiftStart !== v.shiftEnd),
+    "Choose a shift or enter different manual shift start and end times",
+  );
   need(
     !isLocked(s, v),
     "Attendance belongs to finalized payroll and cannot be changed",
@@ -158,8 +168,9 @@ function attendance(s: Workspace, input: any, now: string): Attendance {
   return {
     ...v,
     rate: v.rate ?? old?.rate ?? w.rate,
-    shiftStart: preserve ? old.shiftStart : shift.start,
-    shiftEnd: preserve ? old.shiftEnd : shift.end,
+    shiftStart:
+      preserve && v.shiftId ? old.shiftStart : shift?.start || v.shiftStart!,
+    shiftEnd: preserve && v.shiftId ? old.shiftEnd : shift?.end || v.shiftEnd!,
     policy: preserve ? old.policy : { ...company(s, v.companyId).policy },
     original: old?.original || {
       clockIn: v.clockIn,
@@ -209,11 +220,30 @@ export function mutate(
         s.workers.find((w) => w.id === val.id)?.companyId === val.companyId,
         "A worker with attendance cannot be moved between companies",
       );
+    if (entity === "workers") {
+      const prior = s.workers.find((w) => w.id === val.id);
+      if (prior?.deletedAt) val.deletedAt = prior.deletedAt;
+      else delete val.deletedAt;
+    }
     const list = (s as any)[entity];
     const index = list.findIndex((x: any) => x.id === val.id);
     if (index < 0) list.push(val);
     else list[index] = val;
     detail = `${index < 0 ? "Created" : "Updated"} ${entity}: ${val.name || val.date}`;
+  } else if (action === "deleteWorker" || action === "restoreWorker") {
+    const worker = s.workers.find((w) => w.id === payload.id);
+    need(worker, "Worker not found");
+    if (action === "deleteWorker") {
+      need(!worker.deletedAt, "Worker already deleted");
+      worker.deletedAt = now;
+      worker.status = "Inactive";
+      detail = `Deleted worker ${worker.code} (${worker.name}); historical attendance and payroll retained`;
+    } else {
+      need(worker.deletedAt, "Worker is not deleted");
+      delete worker.deletedAt;
+      worker.status = "Active";
+      detail = `Restored worker ${worker.code} (${worker.name})`;
+    }
   } else if (action === "removeAttendance") {
     const a = s.attendance.find((x) => x.id === payload.id);
     need(a, "Attendance not found");

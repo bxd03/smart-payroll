@@ -331,3 +331,115 @@ test("signed-in owner retains legacy records; other identities are separate", ()
   assert.equal(ownerClause("guest:123"), "owner = ?");
   assert.ok(ownerClause("smartpayroll-v2").includes("owner IS NULL"));
 });
+
+import { selectedWorkspaceAccess } from "../lib/workspace-access";
+test("only configured signed-in owner can select other workspaces", () => {
+  const url = "https://payroll.test/api/state?workspace=guest%3Atarget";
+  assert.equal(
+    selectedWorkspaceAccess(new Request(url), "owner@example.com").denied,
+    true,
+  );
+  const other = new Request(url, {
+    headers: {
+      "oai-authenticated-user-id": "other",
+      "oai-authenticated-user-email": "other@example.com",
+    },
+  });
+  assert.equal(
+    selectedWorkspaceAccess(other, "owner@example.com").denied,
+    true,
+  );
+  const owner = new Request(url, {
+    headers: {
+      "oai-authenticated-user-id": "owner",
+      "oai-authenticated-user-email": "owner@example.com",
+    },
+  });
+  const access = selectedWorkspaceAccess(owner, "owner@example.com");
+  assert.equal(access.denied, false);
+  assert.equal(access.isSuperadmin, true);
+  assert.equal(access.key, "guest:target");
+  assert.equal(
+    workspaceAccess(
+      new Request("https://payroll.test?isSuperadmin=true"),
+      "owner@example.com",
+    ).isSuperadmin,
+    false,
+  );
+});
+test("worker deletion is restorable and preserves attendance and payroll inputs", () => {
+  let s = makeDemo();
+  const w = s.workers[0],
+    count = s.attendance.length;
+  s = mutate(s, "deleteWorker", { id: w.id }, "test").state;
+  assert.ok(s.workers[0].deletedAt);
+  assert.equal(s.workers[0].status, "Inactive");
+  assert.equal(s.attendance.length, count);
+  const old = s.attendance[0];
+  s = mutate(
+    s,
+    "saveEntity",
+    { entity: "attendance", value: { ...old, clockOut: "19:00" } },
+    "test",
+  ).state;
+  assert.equal(s.attendance[0].original.clockOut, old.clockOut);
+  assert.throws(
+    () =>
+      mutate(
+        s,
+        "saveEntity",
+        {
+          entity: "attendance",
+          value: { ...old, id: crypto.randomUUID(), date: "2026-12-31" },
+        },
+        "test",
+      ),
+    /Restore/,
+  );
+  s = mutate(s, "restoreWorker", { id: w.id }, "test").state;
+  assert.equal(s.workers[0].deletedAt, undefined);
+  assert.equal(s.workers[0].status, "Active");
+});
+test("manual punch intervals work without an assigned shift", () => {
+  const s = makeDemo(),
+    w = s.workers[0];
+  const value = {
+    id: crypto.randomUUID(),
+    companyId: w.companyId,
+    workerId: w.id,
+    siteId: w.siteId,
+    shiftId: "",
+    shiftStart: "08:00",
+    shiftEnd: "17:00",
+    date: "2026-12-20",
+    clockIn: "08:00",
+    clockOut: "17:00",
+    breakMinutes: 60,
+    notes: "Manual interval",
+    reviewNote: "",
+    sourceId: "",
+  };
+  const next = mutate(
+    s,
+    "saveEntity",
+    { entity: "attendance", value },
+    "test",
+  ).state;
+  const a = next.attendance.find((a) => a.id === value.id)!;
+  assert.equal(a.shiftId, "");
+  assert.equal(calculate(a).hours, 8);
+  assert.equal(a.original.clockIn, "08:00");
+  assert.throws(
+    () =>
+      mutate(
+        s,
+        "saveEntity",
+        {
+          entity: "attendance",
+          value: { ...value, shiftStart: "17:00", shiftEnd: "17:00" },
+        },
+        "test",
+      ),
+    /Choose a shift/,
+  );
+});

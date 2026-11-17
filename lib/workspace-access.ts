@@ -9,6 +9,8 @@ export function workspaceAccess(req: Request, ownerEmail?: string) {
           : "user:" + userId,
       actor: email,
       signedIn: true,
+      isSuperadmin:
+        !!ownerEmail && email.toLowerCase() === ownerEmail.toLowerCase(),
       setCookie: "",
     };
   }
@@ -30,6 +32,7 @@ export function workspaceAccess(req: Request, ownerEmail?: string) {
     key: "guest:" + token,
     actor: "Guest workspace",
     signedIn: false,
+    isSuperadmin: false,
     setCookie: existing
       ? ""
       : `sp_workspace=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${new URL(req.url).protocol === "https:" ? "; Secure" : ""}`,
@@ -39,4 +42,11 @@ export function ownerClause(key: string) {
   return key === "smartpayroll-v2"
     ? "(owner = ? OR owner IS NULL)"
     : "owner = ?";
+}
+
+export function selectedWorkspaceAccess(req: Request, ownerEmail?: string) {
+  const access = workspaceAccess(req, ownerEmail);
+  const selected = new URL(req.url).searchParams.get("workspace");
+  if (selected && !access.isSuperadmin) return { ...access, denied: true };
+  return { ...access, key: selected || access.key, denied: false };
 }

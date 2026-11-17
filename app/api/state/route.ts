@@ -1,11 +1,19 @@
 import { env } from "cloudflare:workers";
 import { emptyWorkspace } from "../../../lib/model";
 import { mutate } from "../../../lib/service";
-import { workspaceAccess, ownerClause } from "../../../lib/workspace-access";
+import {
+  selectedWorkspaceAccess,
+  ownerClause,
+} from "../../../lib/workspace-access";
 const json = (v: any, status = 200) =>
   Response.json(v, { status, headers: { "Cache-Control": "no-store" } });
 export async function GET(req: Request) {
-  const access = workspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
+  const access = selectedWorkspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
+  if (access.denied)
+    return Response.json(
+      { error: "Superadmin access required" },
+      { status: 403 },
+    );
   const key = access.key;
   try {
     const db = env.DB!;
@@ -28,7 +36,12 @@ export async function GET(req: Request) {
     const response = json({
       workspace: {
         signedIn: access.signedIn,
-        name: access.signedIn ? "My workspace" : "Guest workspace",
+        isSuperadmin: access.isSuperadmin,
+        name: access.isSuperadmin
+          ? "Superadmin"
+          : access.signedIn
+            ? "My workspace"
+            : "Guest workspace",
       },
       data: row ? JSON.parse(row.data as string) : emptyWorkspace,
       revision: row?.revision || 0,
@@ -43,7 +56,12 @@ export async function GET(req: Request) {
   }
 }
 export async function POST(req: Request) {
-  const access = workspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
+  const access = selectedWorkspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
+  if (access.denied)
+    return Response.json(
+      { error: "Superadmin access required" },
+      { status: 403 },
+    );
   const key = access.key;
   if (access.setCookie)
     return json({ error: "Open the workspace before saving records." }, 401);

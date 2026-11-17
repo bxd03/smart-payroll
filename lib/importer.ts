@@ -114,6 +114,8 @@ export function validateImport(
         w.code.toLowerCase() === r.workerCode.toLowerCase(),
     );
     if (!w) issues.push("Unknown worker ID");
+    else if (w.deletedAt)
+      issues.push("Worker is deleted; restore before importing");
     if (
       !/^\d{4}-\d{2}-\d{2}$/.test(r.date) ||
       Number.isNaN(Date.parse(r.date + "T12:00:00"))

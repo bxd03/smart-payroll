@@ -103,3 +103,11 @@ This folder contains application source, locked dependencies, schema migrations,
 Open the HTTPS live URL on a phone. Android Chrome: use Install app when offered, or the browser menu > Install app / Add to Home screen. iPhone Safari: Share > Add to Home Screen > Add. A manifest, standalone display mode, 192/512 px icons, maskable icon and Apple touch icon are included. The service worker caches only the offline page, manifest and app icons. Payroll APIs, uploaded documents, authentication responses and app HTML are never cached by the service worker. Internet is required for payroll operations.
 
 The new additive migration `drizzle/0002_wooden_the_twelve.sql` scopes source files and audit events to workspaces; apply it after the earlier migrations for local development. Production migrations apply through Sites.
+
+## Superadmin and direct attendance editing
+
+The site owner signs in using the original ChatGPT account. Its verified email must match the private `SMARTPAYROLL_OWNER_EMAIL` runtime value; this enables superadmin server-side. Superadmin can list all persisted account, guest and legacy workspaces, open current workspaces, review documents and history, make normal edits, and export raw data with all audit events. Ordinary users cannot choose another workspace through query parameters. No superadmin email or credentials are stored in the public repository.
+
+Temporary workers now have inline shift selection, work date, punch-in/out inputs, break input, and Save times. A shift is optional when a complete manual interval is supplied. Worker Edit/Delete buttons are explicit. Deletion is soft: deleted workers can be restored and historical attendance/payroll stay intact. Attendance records have inline editable clock times and Save clock times. Finalized payroll remains locked, and original attendance times are retained.
+
+Database: Cloudflare D1 stores workspace records, source-file metadata and audit events. R2 stores the actual uploaded source files. Browser cookies identify a guest workspace; payroll data is stored on the server.

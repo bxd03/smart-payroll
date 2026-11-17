@@ -46,6 +46,7 @@ export type Worker = {
   bank: string;
   account: string;
   paymentMethod: "Bank transfer" | "Cash";
+  deletedAt?: string;
   status: "Active" | "Inactive";
 };
 export type Attendance = {

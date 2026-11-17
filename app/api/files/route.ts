@@ -1,5 +1,8 @@
 import { env } from "cloudflare:workers";
-import { workspaceAccess, ownerClause } from "../../../lib/workspace-access";
+import {
+  selectedWorkspaceAccess,
+  ownerClause,
+} from "../../../lib/workspace-access";
 const allowed = [
   "application/pdf",
   "image/png",
@@ -10,7 +13,12 @@ const allowed = [
   "application/vnd.ms-excel",
 ];
 export async function POST(req: Request) {
-  const access = workspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
+  const access = selectedWorkspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
+  if (access.denied)
+    return Response.json(
+      { error: "Superadmin access required" },
+      { status: 403 },
+    );
   if (access.setCookie)
     return Response.json(
       { error: "Open the workspace before uploading." },
@@ -59,7 +67,12 @@ export async function POST(req: Request) {
   }
 }
 export async function GET(req: Request) {
-  const access = workspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
+  const access = selectedWorkspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
+  if (access.denied)
+    return Response.json(
+      { error: "Superadmin access required" },
+      { status: 403 },
+    );
   if (access.setCookie) return new Response("Not found", { status: 404 });
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return new Response("Missing file ID", { status: 400 });
