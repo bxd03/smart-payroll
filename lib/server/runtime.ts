@@ -1,6 +1,8 @@
 import { getDatabase } from "@netlify/database";
 let database: ReturnType<typeof getDatabase> | undefined;
-export const pool = () => (database ??= getDatabase({ connectionString: process.env.NETLIFY_DB_URL })).pool;
+export const pool = () =>
+  (database ??= getDatabase({ connectionString: process.env.NETLIFY_DB_URL }))
+    .pool;
 function compile(sql: string) {
   let i = 0;
   const ignore = /INSERT OR IGNORE/i.test(sql);
@@ -36,7 +38,7 @@ class Statement {
 }
 export const env = {
   get SMARTPAYROLL_OWNER_EMAIL() {
-    return process.env.SMARTPAYROLL_OWNER_EMAIL;
+    return process.env.SMARTPAYROLL_OWNER_EMAIL?.trim().toLowerCase();
   },
   DB: {
     prepare(query: string) {

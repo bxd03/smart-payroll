@@ -17,6 +17,13 @@ test('Netlify PostgreSQL migration, secure owner setup, sessions, imports and at
  const forged=new Request(origin+'/api/admin/workspaces',{headers:{'oai-authenticated-user-id':'owner','oai-authenticated-user-email':'owner@example.test'}});
  assert.equal((await workspaces(forged)).status,403);
  assert.equal((await auth(req('/api/auth',{action:'register',email:'owner@example.test',password:'a-long-password!'}))).status,403);
+ const configuredKey=process.env.SMARTPAYROLL_ADMIN_SETUP_KEY;
+ process.env.SMARTPAYROLL_ADMIN_SETUP_KEY='too-short';
+ const shortKey=await auth(req('/api/auth',{action:'register',email:'owner@example.test',password:'a-long-password!',setupKey:'too-short'}));
+ assert.equal(shortKey.status,503);assert.match((await shortKey.json() as any).error,/at least 24/);
+ process.env.SMARTPAYROLL_ADMIN_SETUP_KEY=configuredKey;
+ const mismatch=await auth(req('/api/auth',{action:'register',email:'owner@example.test',password:'a-long-password!',setupKey:'different-private-key-at-least-24-characters'}));
+ assert.equal(mismatch.status,403);const mismatchBody=await mismatch.text();assert.match(mismatchBody,/does not match/);assert.equal(mismatchBody.includes(configuredKey!),false);
  const login=await auth(req('/api/auth',{action:'register',email:'owner@example.test',password:'a-long-password!',setupKey:process.env.SMARTPAYROLL_ADMIN_SETUP_KEY}));
  assert.equal(login.status,200,await login.clone().text());
  const session=login.headers.get('set-cookie')!.split(';')[0];

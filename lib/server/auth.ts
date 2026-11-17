@@ -39,7 +39,14 @@ export async function authenticatedRequest(req: Request) {
     if (user) {
       headers.set("oai-authenticated-user-id", user.id);
       // The reserved owner address can only be created with the private setup key.
-      headers.set("oai-authenticated-user-email", !user.is_admin && user.email === process.env.SMARTPAYROLL_OWNER_EMAIL?.toLowerCase() ? "account:" + user.id : user.email);
+      headers.set(
+        "oai-authenticated-user-email",
+        !user.is_admin &&
+          user.email ===
+            process.env.SMARTPAYROLL_OWNER_EMAIL?.trim().toLowerCase()
+          ? "account:" + user.id
+          : user.email,
+      );
     }
   }
   return new Request(req, { headers });

@@ -43,29 +43,47 @@ export async function POST(req: Request) {
         { status: 429 },
       );
     if (action === "register") {
-      const owner = process.env.SMARTPAYROLL_OWNER_EMAIL?.toLowerCase();
+      const owner = process.env.SMARTPAYROLL_OWNER_EMAIL?.trim().toLowerCase();
       if (!owner)
         return Response.json(
           { error: "Owner setup is not configured yet." },
           { status: 503 },
         );
       const isAdmin = email === owner;
+      if (setupKey && !isAdmin)
+        return Response.json({error: "For owner setup, use the exact email configured in SMARTPAYROLL_OWNER_EMAIL in Netlify."}, {status:403});
       const secret = process.env.SMARTPAYROLL_ADMIN_SETUP_KEY || "";
-      const validKey =
-        secret.length >= 24 &&
-        typeof setupKey === "string" &&
-        timingSafeEqual(
-          Buffer.from(digest(setupKey)),
-          Buffer.from(digest(secret)),
-        );
-      if (isAdmin && !validKey)
-        return Response.json(
-          {
-            error:
-              "The owner account requires the private setup key from Netlify environment variables.",
-          },
-          { status: 403 },
-        );
+      if (isAdmin) {
+        if (!secret || secret.length < 24)
+          return Response.json(
+            {
+              error:
+                "Owner setup is not ready: set SMARTPAYROLL_ADMIN_SETUP_KEY in Netlify to a private value of at least 24 characters, then redeploy.",
+            },
+            { status: 503 },
+          );
+        if (typeof setupKey !== "string" || !setupKey)
+          return Response.json(
+            {
+              error:
+                "Select the owner-account option and enter your private setup key.",
+            },
+            { status: 403 },
+          );
+        if (
+          !timingSafeEqual(
+            Buffer.from(digest(setupKey)),
+            Buffer.from(digest(secret)),
+          )
+        )
+          return Response.json(
+            {
+              error:
+                "The setup key does not match the deployed value. Copy the exact value from Netlify. If you changed it, redeploy before trying again.",
+            },
+            { status: 403 },
+          );
+      }
       await pool().query(
         "INSERT INTO sp_accounts(id,email,password_hash,is_admin) VALUES($1,$2,$3,$4)",
         [randomUUID(), email, passwordHash(password), isAdmin],
