@@ -112,7 +112,7 @@ const desc: any = {
   "All workspaces":
     "Superadmin access to database records, uploaded documents, and audit history.",
   Overview:
-    "Your temporary workforce. Every hour, every company, every payday.",
+    "Attendance, working hours, and payroll for your temporary workforce.",
   "Companies & properties":
     "Manage clients, warehouses, properties, and their payroll policies.",
   "Temporary workers":
@@ -409,9 +409,7 @@ export default function App() {
                     ? "YOUR WORKFORCE, AT A GLANCE"
                     : "TEMPORARY WORKFORCE MANAGEMENT"}
                 </div>
-                <h1>
-                  {page === "Overview" ? "Let’s make payday simple." : page}
-                </h1>
+                <h1>{page === "Overview" ? "Payroll dashboard" : page}</h1>
                 <p>{desc[page]}</p>
               </div>
               <div className="filters">
@@ -597,56 +595,62 @@ function Overview() {
   const max = Math.max(...weekValues, 1);
   return (
     <>
-      <div className="dashboardHero">
-        <div>
-          <span className="heroPill">
-            <i /> FROM FIRST SHIFT TO FINAL PAYSLIP
-          </span>
-          <h2>
-            Good work deserves
-            <br />
-            <em>a smooth payday.</em>
-          </h2>
-          <p>
-            Bring your companies, attendance, and payroll together.
-            <br />
-            More clarity for you. More confidence for your team.
-          </p>
-          <Button
-            variant="heroButton"
-            onClick={() => navigate("Attendance scanner")}
-          >
-            <ScanLine size={17} /> Import attendance <ArrowUpRight size={16} />
+      <section className="payrollSummary" aria-label="Monthly payroll overview">
+        <div className="summaryTotal">
+          <span className="summaryLabel">ESTIMATED PAYROLL</span>
+          <strong>{money(pay)}</strong>
+          <p>Recorded attendance · {month}</p>
+          <Button onClick={() => navigate("Payroll calculator")}>
+            <Plus size={15} /> New payroll run
           </Button>
         </div>
-        <div className="heroVisual">
-          <div className="orbit orbitOne" />
-          <div className="orbit orbitTwo" />
-          <div className="heroChip">
-            <ShieldCheck size={14} /> Every hour, accounted for
-          </div>
-          <div className="heroPayCard">
+        <div className="payrollBreakdown">
+          <div>
+            <i className="regularDot" />
             <span>
-              ESTIMATED MONTHLY PAYROLL <Wallet size={16} />
+              Regular pay
+              <strong>
+                {money(calc.reduce((n: number, c: any) => n + c.regularPay, 0))}
+              </strong>
             </span>
-            <strong>{money(pay)}</strong>
-            <div className="payCardRule" />
-            <small>
-              <i /> Based on recorded working hours
-            </small>
-            <div className="miniBars">
-              {[45, 70, 60, 90, 65, 83, 100, 75, 95, 80, 100, 90].map(
-                (h, i) => (
-                  <i key={i} style={{ height: h + "%" }} />
-                ),
-              )}
+          </div>
+          <div>
+            <i className="overtimeDot" />
+            <span>
+              Overtime pay
+              <strong>
+                {money(calc.reduce((n: number, c: any) => n + c.otPay, 0))}
+              </strong>
+            </span>
+          </div>
+          <small>Before allowances and deductions</small>
+        </div>
+        <div className="payrollDonutArea">
+          <div
+            className="payrollDonut"
+            role="img"
+            aria-label={
+              pay > 0
+                ? "Estimated payroll split between regular pay and overtime pay. Amounts are listed beside the chart."
+                : "No recorded payroll for this period"
+            }
+            style={{
+              background:
+                pay > 0
+                  ? `conic-gradient(#56a9cc 0% ${(calc.reduce((n: number, c: any) => n + c.regularPay, 0) / pay) * 100}%, #9b86c7 0% 100%)`
+                  : "#e7edf3",
+            }}
+          >
+            <div>
+              <b>{ats.length}</b>
+              <span>attendance records</span>
             </div>
           </div>
-          <span className="heroCheck">
-            <Check size={28} />
-          </span>
+          <small>
+            {pay > 0 ? "Payroll composition" : "No payroll recorded yet"}
+          </small>
         </div>
-      </div>
+      </section>
       <div className="statsGrid">
         <Stat
           label="Active workers"
