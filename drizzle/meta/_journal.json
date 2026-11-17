@@ -15,6 +15,13 @@
       "when": 1794882174749,
       "tag": "0001_oval_adam_warlock",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794886173469,
+      "tag": "0002_wooden_the_twelve",
+      "breakpoints": true
     }
   ]
 }

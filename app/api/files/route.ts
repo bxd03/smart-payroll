@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { workspaceAccess, ownerClause } from "../../../lib/workspace-access";
 const allowed = [
   "application/pdf",
   "image/png",
@@ -9,6 +10,12 @@ const allowed = [
   "application/vnd.ms-excel",
 ];
 export async function POST(req: Request) {
+  const access = workspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
+  if (access.setCookie)
+    return Response.json(
+      { error: "Open the workspace before uploading." },
+      { status: 401 },
+    );
   try {
     if (req.headers.get("origin") !== new URL(req.url).origin)
       return new Response("Forbidden", { status: 403 });
@@ -32,9 +39,9 @@ export async function POST(req: Request) {
     });
     await env
       .DB!.prepare(
-        "INSERT INTO source_files(id,name,type,size,created_at,rows) VALUES(?,?,?,?,?,0)",
+        "INSERT INTO source_files(id,name,type,size,created_at,rows,owner) VALUES(?,?,?,?,?,0,?)",
       )
-      .bind(id, name, file.type, file.size, createdAt)
+      .bind(id, name, file.type, file.size, createdAt, access.key)
       .run();
     return Response.json({
       id,
@@ -52,11 +59,15 @@ export async function POST(req: Request) {
   }
 }
 export async function GET(req: Request) {
+  const access = workspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
+  if (access.setCookie) return new Response("Not found", { status: 404 });
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return new Response("Missing file ID", { status: 400 });
   const row = await env
-    .DB!.prepare("SELECT name,type FROM source_files WHERE id=?")
-    .bind(id)
+    .DB!.prepare(
+      `SELECT name,type FROM source_files WHERE id=? AND ${ownerClause(access.key)}`,
+    )
+    .bind(id, access.key)
     .first();
   if (!row) return new Response("Not found", { status: 404 });
   const file = await env.BUCKET!.get(id);

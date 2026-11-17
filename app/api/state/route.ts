@@ -1,10 +1,12 @@
 import { env } from "cloudflare:workers";
 import { emptyWorkspace } from "../../../lib/model";
 import { mutate } from "../../../lib/service";
-const key = "smartpayroll-v2";
+import { workspaceAccess, ownerClause } from "../../../lib/workspace-access";
 const json = (v: any, status = 200) =>
   Response.json(v, { status, headers: { "Cache-Control": "no-store" } });
-export async function GET() {
+export async function GET(req: Request) {
+  const access = workspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
+  const key = access.key;
   try {
     const db = env.DB!;
     const row = await db
@@ -13,26 +15,38 @@ export async function GET() {
       .first();
     const files = await db
       .prepare(
-        "SELECT id,name,type,size,created_at AS createdAt,rows FROM source_files ORDER BY created_at DESC LIMIT 200",
+        `SELECT id,name,type,size,created_at AS createdAt,rows FROM source_files WHERE ${ownerClause(key)} ORDER BY created_at DESC LIMIT 200`,
       )
+      .bind(key)
       .all();
     const audit = await db
       .prepare(
-        "SELECT id,action,actor,detail,created_at AS createdAt FROM audit_events ORDER BY created_at DESC LIMIT 200",
+        `SELECT id,action,actor,detail,created_at AS createdAt FROM audit_events WHERE ${ownerClause(key)} ORDER BY created_at DESC LIMIT 200`,
       )
+      .bind(key)
       .all();
-    return json({
+    const response = json({
+      workspace: {
+        signedIn: access.signedIn,
+        name: access.signedIn ? "My workspace" : "Guest workspace",
+      },
       data: row ? JSON.parse(row.data as string) : emptyWorkspace,
       revision: row?.revision || 0,
       files: files.results,
       audit: audit.results,
     });
+    if (access.setCookie) response.headers.set("Set-Cookie", access.setCookie);
+    return response;
   } catch (e) {
     console.error(e);
     return json({ error: "Could not load workspace. Please try again." }, 500);
   }
 }
 export async function POST(req: Request) {
+  const access = workspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
+  const key = access.key;
+  if (access.setCookie)
+    return json({ error: "Open the workspace before saving records." }, 401);
   try {
     if (req.headers.get("origin") !== new URL(req.url).origin)
       return json({ error: "Request origin is not allowed" }, 403);
@@ -60,9 +74,18 @@ export async function POST(req: Request) {
         },
         409,
       );
-    const actor =
-      req.headers.get("oai-authenticated-user-email") ||
-      "Workspace administrator";
+    const actor = access.actor;
+    if (payload?.sourceId || payload?.value?.sourceId) {
+      const sourceId = payload.sourceId || payload.value.sourceId;
+      const owned = await db
+        .prepare(
+          `SELECT id FROM source_files WHERE id=? AND ${ownerClause(key)}`,
+        )
+        .bind(sourceId, key)
+        .first();
+      if (!owned)
+        return json({ error: "Source file not found in this workspace" }, 404);
+    }
     const { state, detail, result } = mutate(
       JSON.parse(row!.data as string),
       action,
@@ -79,9 +102,9 @@ export async function POST(req: Request) {
         .bind(JSON.stringify(state), key, revision),
       db
         .prepare(
-          "INSERT INTO audit_events(id,action,actor,detail,created_at) SELECT ?,?,?,?,? WHERE changes()=1",
+          "INSERT INTO audit_events(id,action,actor,detail,created_at,owner) SELECT ?,?,?,?,?,? WHERE changes()=1",
         )
-        .bind(auditId, action, actor, detail, now),
+        .bind(auditId, action, actor, detail, now, key),
     ]);
     if (!results[0].meta.changes)
       return json(

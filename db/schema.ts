@@ -5,6 +5,7 @@ export const payrollState = sqliteTable("payroll_state", {
   revision: integer("revision").notNull().default(0),
 });
 export const sourceFiles = sqliteTable("source_files", {
+  owner: text("owner"),
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   type: text("type").notNull(),
@@ -13,6 +14,7 @@ export const sourceFiles = sqliteTable("source_files", {
   rows: integer("rows").notNull().default(0),
 });
 export const auditEvents = sqliteTable("audit_events", {
+  owner: text("owner"),
   id: text("id").primaryKey(),
   action: text("action").notNull(),
   actor: text("actor").notNull(),

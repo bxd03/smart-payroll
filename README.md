@@ -1,6 +1,6 @@
 # SmartPayroll
 
-A complete private temporary-worker payroll web app based on the 11 SmartPayroll modules in the supplied proposal. This standalone application lives at the root of the bxd03/smart-payroll GitHub repository.
+A complete temporary-worker payroll web app based on the 11 SmartPayroll modules in the supplied proposal. The standalone application lives at the root of https://github.com/bxd03/smart-payroll.
 
 Live: https://smartpayroll-badariah.greyapex8.chatgpt.site
 
@@ -24,7 +24,7 @@ Names omit “AI” as requested. Recognition uses Tesseract OCR; anomaly detect
 
 ## Stack
 
-React 19 + TypeScript, Vinext/Vite, Cloudflare Workers, D1, R2, Zod, SheetJS, PDF.js, Tesseract.js, jsPDF. Hosted access is enforced by the private Site's ChatGPT sign-in policy. Source files, banking details and payroll records are not public.
+React 19 + TypeScript, Vinext/Vite, Cloudflare Workers, D1, R2, Zod, SheetJS, PDF.js, Tesseract.js, jsPDF. The site is public. Each anonymous browser has a separate workspace selected by an opaque HttpOnly cookie. Signed-in visitors receive a separate account workspace. Source files, banking details and payroll records are not public.
 
 ## Run locally
 
@@ -71,7 +71,7 @@ The original proposal examples are covered by tests: 07:33/07:35 -> 07:30; 07:36
 
 ## Persistence, authorization and audit
 
-D1 stores the versioned workspace document plus normalized source metadata and audit events; R2 stores source files. `smartpayroll-v2` is a separate state key so the previous prototype is not overwritten. API operations validate entity relationships and financial inputs server-side; finalized attendance and payroll cannot be edited. Optimistic revisions reject competing stale writes. Updates and their audit insert are in one D1 batch. On a conflict, reload and reapply the intended change. The current hosting policy allows only the owner; any future access change needs a separate explicit authorization design/review. Do not make payroll endpoints public without server-side workspace membership and role checks.
+D1 stores the versioned workspace document plus normalized source metadata and audit events; R2 stores source files. `smartpayroll-v2` is a separate state key so the previous prototype is not overwritten. API operations validate entity relationships and financial inputs server-side; finalized attendance and payroll cannot be edited. Optimistic revisions reject competing stale writes. Updates and their audit insert are in one D1 batch. On a conflict, reload and reapply the intended change. All payroll, document and audit queries are scoped server-side to the current workspace. The original owner keeps the existing workspace via the runtime SMARTPAYROLL_OWNER_EMAIL secret; no owner email is checked into source. Guests cannot select an account or legacy owner key through cookies. Guest records depend on keeping the browser cookie. Signing in opens a separate account workspace; guest data is not automatically transferred.
 
 ## Import constraints
 
@@ -96,4 +96,10 @@ Tests cover tolerance boundaries, overtime and monetary precision, overnight shi
 
 ## Repository and deployment
 
-This folder contains application source, locked dependencies, schema migrations, tests, and asset preparation. No production data, uploaded documents, runtime secrets, local database files, or build outputs belong in Git. The Site's deployment source repository is managed separately by the hosting service; The bxd03/smart-payroll GitHub repository holds this standalone source copy. GitHub commits do not automatically publish to the Site. Publish through the Sites source/build/deploy workflow to apply schema migrations and R2/D1 bindings.
+This folder contains application source, locked dependencies, schema migrations, tests, and asset preparation. No production data, uploaded documents, runtime secrets, local database files, or build outputs belong in Git. The Site's deployment source repository is managed separately by the hosting service; GitHub holds this standalone source copy. GitHub commits do not automatically publish to the Site. Publish through the Sites source/build/deploy workflow to apply schema migrations and R2/D1 bindings.
+
+## Phone installation (PWA)
+
+Open the HTTPS live URL on a phone. Android Chrome: use Install app when offered, or the browser menu > Install app / Add to Home screen. iPhone Safari: Share > Add to Home Screen > Add. A manifest, standalone display mode, 192/512 px icons, maskable icon and Apple touch icon are included. The service worker caches only the offline page, manifest and app icons. Payroll APIs, uploaded documents, authentication responses and app HTML are never cached by the service worker. Internet is required for payroll operations.
+
+The new additive migration `drizzle/0002_wooden_the_twelve.sql` scopes source files and audit events to workspaces; apply it after the earlier migrations for local development. Production migrations apply through Sites.

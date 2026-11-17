@@ -280,3 +280,54 @@ test("spreadsheet and OCR row mapping, times and import duplicates", () => {
     ),
   );
 });
+
+import { workspaceAccess, ownerClause } from "../lib/workspace-access";
+test("anonymous visitors receive separate opaque workspaces and secure cookies", () => {
+  const a = workspaceAccess(new Request("https://payroll.test/api/state"));
+  const b = workspaceAccess(new Request("https://payroll.test/api/state"));
+  assert.notEqual(a.key, b.key);
+  assert.ok(a.setCookie.includes("HttpOnly; SameSite=Lax"));
+  assert.ok(a.setCookie.includes("; Secure"));
+  const cookie = a.setCookie.split(";")[0];
+  const again = workspaceAccess(
+    new Request("https://payroll.test/api/state", { headers: { cookie } }),
+  );
+  assert.equal(a.key, again.key);
+  assert.equal(again.setCookie, "");
+});
+test("forged guest cookie cannot select owner or signed-in workspace", () => {
+  for (const value of ["smartpayroll-v2", "user:owner", "../../owner", "123"]) {
+    const a = workspaceAccess(
+      new Request("https://payroll.test", {
+        headers: { cookie: "sp_workspace=" + value },
+      }),
+    );
+    assert.ok(a.key.startsWith("guest:"));
+    assert.ok(a.setCookie);
+  }
+});
+test("signed-in owner retains legacy records; other identities are separate", () => {
+  const request = (id: string, email: string) =>
+    new Request("https://payroll.test", {
+      headers: {
+        "oai-authenticated-user-id": id,
+        "oai-authenticated-user-email": email,
+      },
+    });
+  assert.equal(
+    workspaceAccess(request("owner", "owner@example.com"), "owner@example.com")
+      .key,
+    "smartpayroll-v2",
+  );
+  assert.equal(
+    workspaceAccess(request("other", "other@example.com"), "owner@example.com")
+      .key,
+    "user:other",
+  );
+  assert.equal(
+    workspaceAccess(request("owner", "owner@example.com")).key,
+    "user:owner",
+  );
+  assert.equal(ownerClause("guest:123"), "owner = ?");
+  assert.ok(ownerClause("smartpayroll-v2").includes("owner IS NULL"));
+});

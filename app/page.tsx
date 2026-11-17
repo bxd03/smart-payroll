@@ -151,7 +151,11 @@ export default function App() {
     [month, setMonth] = useState(today().slice(0, 7)),
     [modal, setModal] = useState<any>(null),
     [mobile, setMobile] = useState(false),
-    [selectedRun, setSelectedRun] = useState("");
+    [selectedRun, setSelectedRun] = useState(""),
+    [workspace, setWorkspace] = useState<any>({
+      signedIn: false,
+      name: "Guest workspace",
+    });
   async function load() {
     setLoading(true);
     setError("");
@@ -160,6 +164,7 @@ export default function App() {
         r: any = await res.json();
       if (!res.ok) throw Error(r.error);
       setState(r.data);
+      if (r.workspace) setWorkspace(r.workspace);
       setRevision(r.revision);
       setFiles(r.files);
       setAudit(r.audit);
@@ -300,20 +305,31 @@ export default function App() {
             <div className="secure">
               <ShieldCheck size={16} />
               <div>
-                <b>Private & protected</b>
-                <small>Authorized workspace access</small>
+                <b>Your separate workspace</b>
+                <small>Records stay within this workspace</small>
               </div>
             </div>
             <div className="profile">
-              <span>NB</span>
+              <span>SP</span>
               <div>
-                <b>Nur Badariah</b>
-                <small>Payroll administrator</small>
+                <b>{workspace.name}</b>
+                <small>
+                  {workspace.signedIn ? "Signed in" : "Saved for this browser"}
+                </small>
               </div>
               <a
-                href="/signout-with-chatgpt?return_to=%2F"
-                title="Sign out"
-                aria-label="Sign out"
+                href={
+                  workspace.signedIn
+                    ? "/signout-with-chatgpt?return_to=%2F"
+                    : "/signin-with-chatgpt?return_to=%2F"
+                }
+                target="_top"
+                title={
+                  workspace.signedIn
+                    ? "Sign out"
+                    : "Sign in for a separate account workspace"
+                }
+                aria-label={workspace.signedIn ? "Sign out" : "Sign in"}
               >
                 <LogOut size={15} />
               </a>
@@ -354,7 +370,7 @@ export default function App() {
               >
                 <RefreshCw size={16} />
               </button>
-              <span className="headerAvatar">NB</span>
+              <span className="headerAvatar">SP</span>
             </div>
           </header>
           <div className="content">
@@ -401,6 +417,13 @@ export default function App() {
                 </label>
               </div>
             </div>
+            {!workspace.signedIn && (
+              <div className="guestNote">
+                Guest workspace · Records are linked to this browser. Keep
+                cookies to return to them. Signing in opens a separate account
+                workspace.
+              </div>
+            )}
             {error && (
               <div role="alert" className="errorBanner">
                 <AlertTriangle size={18} />
