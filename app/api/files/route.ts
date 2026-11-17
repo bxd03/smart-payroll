@@ -1,4 +1,5 @@
-import { env } from "cloudflare:workers";
+import { env } from "../../../lib/server/runtime";
+import { authenticatedRequest } from "../../../lib/server/auth";
 import {
   selectedWorkspaceAccess,
   ownerClause,
@@ -13,6 +14,7 @@ const allowed = [
   "application/vnd.ms-excel",
 ];
 export async function POST(req: Request) {
+  req = await authenticatedRequest(req);
   const access = selectedWorkspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
   if (access.denied)
     return Response.json(
@@ -29,9 +31,9 @@ export async function POST(req: Request) {
       return new Response("Forbidden", { status: 403 });
     const form = await req.formData(),
       file = form.get("file");
-    if (!(file instanceof File) || file.size > 15 * 1024 * 1024 || !file.size)
+    if (!(file instanceof File) || file.size > 4 * 1024 * 1024 || !file.size)
       return Response.json(
-        { error: "Choose a nonempty file smaller than 15 MB" },
+        { error: "Choose a nonempty file smaller than 4 MB" },
         { status: 400 },
       );
     if (!allowed.includes(file.type) && !/\.(csv|xlsx|xls)$/i.test(file.name))
@@ -67,6 +69,7 @@ export async function POST(req: Request) {
   }
 }
 export async function GET(req: Request) {
+  req = await authenticatedRequest(req);
   const access = selectedWorkspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
   if (access.denied)
     return Response.json(

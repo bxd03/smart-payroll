@@ -1,6 +1,8 @@
-import { env } from "cloudflare:workers";
+import { env } from "../../../../lib/server/runtime";
+import { authenticatedRequest } from "../../../../lib/server/auth";
 import { workspaceAccess } from "../../../../lib/workspace-access";
 export async function GET(req: Request) {
+  req = await authenticatedRequest(req);
   const access = workspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
   if (!access.isSuperadmin)
     return Response.json(

@@ -349,22 +349,17 @@ export default function App() {
                   {workspace.signedIn ? "Signed in" : "Saved for this browser"}
                 </small>
               </div>
-              <a
-                href={
-                  workspace.signedIn
-                    ? "/signout-with-chatgpt?return_to=%2F"
-                    : "/signin-with-chatgpt?return_to=%2F"
-                }
-                target="_top"
-                title={
-                  workspace.signedIn
-                    ? "Sign out"
-                    : "Sign in for a separate account workspace"
-                }
-                aria-label={workspace.signedIn ? "Sign out" : "Sign in"}
-              >
-                <LogOut size={15} />
-              </a>
+              {workspace.signedIn ? (
+                <form method="post" action="/signout">
+                  <button type="submit" aria-label="Sign out" title="Sign out">
+                    <LogOut size={15} />
+                  </button>
+                </form>
+              ) : (
+                <a href="/login" title="Sign in" aria-label="Sign in">
+                  <LogOut size={15} />
+                </a>
+              )}
             </div>
           </div>
         </aside>

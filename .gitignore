@@ -47,3 +47,5 @@ yarn-error.log*
 # Generated OCR and PDF engines (rebuilt from locked npm dependencies)
 /public/ocr/
 /public/pdf.worker.min.mjs
+
+.netlify

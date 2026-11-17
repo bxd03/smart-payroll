@@ -1,4 +1,5 @@
-import { env } from "cloudflare:workers";
+import { env } from "../../../lib/server/runtime";
+import { authenticatedRequest } from "../../../lib/server/auth";
 import { emptyWorkspace } from "../../../lib/model";
 import { mutate } from "../../../lib/service";
 import {
@@ -8,6 +9,7 @@ import {
 const json = (v: any, status = 200) =>
   Response.json(v, { status, headers: { "Cache-Control": "no-store" } });
 export async function GET(req: Request) {
+  req = await authenticatedRequest(req);
   const access = selectedWorkspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
   if (access.denied)
     return Response.json(
@@ -56,6 +58,7 @@ export async function GET(req: Request) {
   }
 }
 export async function POST(req: Request) {
+  req = await authenticatedRequest(req);
   const access = selectedWorkspaceAccess(req, env.SMARTPAYROLL_OWNER_EMAIL);
   if (access.denied)
     return Response.json(

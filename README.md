@@ -1,3 +1,9 @@
+# Netlify migration status
+
+The main branch now builds with standard Next.js for Netlify, using managed Netlify PostgreSQL for workspace data, file bytes, accounts and sessions. The existing Cloudflare publication is separate and remains unchanged. A successful deploy must be verified before calling the new address live.
+
+See [Netlify setup and data transfer](docs/NETLIFY_MIGRATION.md) for owner activation and importing existing workspaces.
+
 # SmartPayroll
 
 A complete temporary-worker payroll web app based on the 11 SmartPayroll modules in the supplied proposal. The standalone application lives at the root of https://github.com/bxd03/smart-payroll.
