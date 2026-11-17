@@ -1,5 +1,6 @@
 import { getDatabase } from "@netlify/database";
-export const pool = () => getDatabase({ connectionString: process.env.NETLIFY_DB_URL }).pool;
+let database: ReturnType<typeof getDatabase> | undefined;
+export const pool = () => (database ??= getDatabase({ connectionString: process.env.NETLIFY_DB_URL })).pool;
 function compile(sql: string) {
   let i = 0;
   const ignore = /INSERT OR IGNORE/i.test(sql);
