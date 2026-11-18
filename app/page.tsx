@@ -75,6 +75,8 @@ import {
   Table,
   Person,
 } from "../components/payroll/ui";
+import { Avatar, ProfileSettings, type Profile } from "../components/payroll/profile";
+import { translate } from "../lib/dashboard-language";
 const Ctx = createContext<any>(null);
 const useApp = () => useContext(Ctx);
 const groups = [
@@ -105,6 +107,7 @@ const groups = [
       ["Error detection", AlertTriangle],
       ["Attendance policies", SlidersHorizontal],
       ["Audit trail", ShieldCheck],
+      ["My profile", Users],
     ],
   },
 ];
@@ -140,6 +143,18 @@ const desc: any = {
     "A transparent record of changes, approvals, and payroll adjustments.",
 };
 export default function App() {
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileError, setProfileError] = useState('');
+  const [profileLoading, setProfileLoading] = useState(true);
+  const t = (text: string) => translate(profile?.language || 'en', text);
+  useEffect(() => {
+    fetch('/api/profile', { cache: 'no-store' }).then(async response => {
+      if (response.status === 401) return;
+      if (!response.ok) throw Error('Unable to load your profile. Reload to try again.');
+      setProfile(await response.json());
+    }).catch(error => setProfileError(error.message)).finally(() => setProfileLoading(false));
+  }, []);
+  useEffect(() => { document.documentElement.lang = profile?.language || 'en'; }, [profile?.language]);
   const [state, setState] = useState<Workspace>(emptyWorkspace),
     [revision, setRevision] = useState(0),
     [files, setFiles] = useState<any[]>([]),
@@ -242,6 +257,7 @@ export default function App() {
   const scoped = (list: any[]) =>
     list.filter((x) => !companyId || x.companyId === companyId);
   const ctx = {
+    t,
     state,
     apiUrl,
     workspace,
@@ -277,7 +293,7 @@ export default function App() {
     setSelectedRun,
   };
   const monthLabel = new Date(month + "-02T12:00:00").toLocaleDateString(
-    "en-MY",
+    profile?.language === "ms" ? "ms-MY" : "en-MY",
     { month: "long", year: "numeric" },
   );
   const issues = anomalies(state, companyId, month).filter(
@@ -305,15 +321,15 @@ export default function App() {
           <div className="workspaceCard">
             <span>SP</span>
             <div>
-              <b>Payroll workspace</b>
-              <small>Temporary workforce</small>
+              <b>{t("Payroll workspace")}</b>
+              <small>{t("Temporary workforce")}</small>
             </div>
             <ChevronRight size={15} />
           </div>
           <div className="navScroll">
             {groups.map((g) => (
               <div className="navGroup" key={g.title}>
-                <p>{g.title}</p>
+                <p>{t(g.title)}</p>
                 {g.items.map(([label, Icon]: any) => (
                   <button
                     key={label}
@@ -321,7 +337,7 @@ export default function App() {
                     className={page === label ? "active" : ""}
                   >
                     <Icon size={18} />
-                    <span>{label}</span>
+                    <span>{t(label)}</span>
                     {label === "Error detection" && issues > 0 && (
                       <i>{issues}</i>
                     )}
@@ -337,16 +353,16 @@ export default function App() {
             <div className="secure">
               <ShieldCheck size={16} />
               <div>
-                <b>Your separate workspace</b>
-                <small>Records stay within this workspace</small>
+                <b>{t("Your separate workspace")}</b>
+                <small>{t("Records stay within this workspace")}</small>
               </div>
             </div>
             <div className="profile">
-              <span>SP</span>
+              <button type="button" className="profileAvatarButton" aria-label={t("My profile")} onClick={() => navigate("My profile")}><Avatar profile={profile} /></button>
               <div>
-                <b>{workspace.name}</b>
+                <b>{profile?.displayName || workspace.name}</b>
                 <small>
-                  {workspace.signedIn ? "Signed in" : "Saved for this browser"}
+                  {t(workspace.signedIn ? "Signed in" : "Saved for this browser")}
                 </small>
               </div>
               {workspace.signedIn ? (
@@ -356,7 +372,7 @@ export default function App() {
                   </button>
                 </form>
               ) : (
-                <a href="/login" title="Sign in" aria-label="Sign in">
+                <a href="/login" title={t("Sign in")} aria-label={t("Sign in")}>
                   <LogOut size={15} />
                 </a>
               )}
@@ -380,14 +396,14 @@ export default function App() {
               >
                 <Menu size={21} />
               </button>
-              <span>Workspace</span>
+              <span>{t("Workspace")}</span>
               <ChevronRight size={13} />
-              <b>{page}</b>
+              <b>{t(page)}</b>
             </div>
             <div className="headerRight">
               <span className="sync">
                 <i />
-                {busy ? "Saving changes" : "All changes saved"}
+                {t(busy ? "Saving changes" : "All changes saved")}
               </span>
               <button
                 className="iconBtn"
@@ -397,7 +413,7 @@ export default function App() {
               >
                 <RefreshCw size={16} />
               </button>
-              <span className="headerAvatar">SP</span>
+              <button type="button" className="profileHeaderButton" onClick={() => navigate("My profile")} aria-label={t("My profile")}><Avatar profile={profile} /><span>{profile?.displayName || t("My profile")}</span></button>
             </div>
           </header>
           <div className="content">
@@ -409,8 +425,8 @@ export default function App() {
                     ? "YOUR WORKFORCE, AT A GLANCE"
                     : "TEMPORARY WORKFORCE MANAGEMENT"}
                 </div>
-                <h1>{page === "Overview" ? "Payroll dashboard" : page}</h1>
-                <p>{desc[page]}</p>
+                <h1>{t(page === "Overview" ? "Payroll dashboard" : page)}</h1>
+                <p>{t(page === "My profile" ? "Personalise your name, photo and dashboard language." : desc[page] || "")}</p>
               </div>
               <div className="filters">
                 <label className="companyFilter">
@@ -420,7 +436,7 @@ export default function App() {
                     value={companyId}
                     onChange={(e) => setCompanyId(e.target.value)}
                   >
-                    <option value="">All companies</option>
+                    <option value="">{t("All companies")}</option>
                     {state.companies.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -514,6 +530,7 @@ export default function App() {
               </Card>
             ) : (
               <>
+                {page === "My profile" && (profileLoading ? <p role="status">Loading profile…</p> : profileError ? <p role="alert">{profileError}</p> : <ProfileSettings profile={profile} onSave={setProfile} t={t} />)}
                 {page === "Overview" && <Overview />}
                 {page === "All workspaces" && workspace.isSuperadmin && (
                   <AllWorkspaces />
@@ -570,7 +587,7 @@ export default function App() {
   );
 }
 function Overview() {
-  const { state, companyId, month, scoped, navigate, open, act, busy } =
+  const { state, companyId, month, scoped, navigate, open, act, busy, t } =
     useApp();
   const ats = state.attendance.filter(
     (a: any) =>
@@ -597,18 +614,18 @@ function Overview() {
     <>
       <section className="payrollSummary" aria-label="Monthly payroll overview">
         <div className="summaryTotal">
-          <span className="summaryLabel">ESTIMATED PAYROLL</span>
+          <span className="summaryLabel">{t("ESTIMATED PAYROLL")}</span>
           <strong>{money(pay)}</strong>
-          <p>Recorded attendance · {month}</p>
+          <p>{t("Recorded attendance")} · {month}</p>
           <Button onClick={() => navigate("Payroll calculator")}>
-            <Plus size={15} /> New payroll run
+            <Plus size={15} /> {t("New payroll run")}
           </Button>
         </div>
         <div className="payrollBreakdown">
           <div>
             <i className="regularDot" />
             <span>
-              Regular pay
+              {t("Regular pay")}
               <strong>
                 {money(calc.reduce((n: number, c: any) => n + c.regularPay, 0))}
               </strong>
@@ -617,13 +634,13 @@ function Overview() {
           <div>
             <i className="overtimeDot" />
             <span>
-              Overtime pay
+              {t("Overtime pay")}
               <strong>
                 {money(calc.reduce((n: number, c: any) => n + c.otPay, 0))}
               </strong>
             </span>
           </div>
-          <small>Before allowances and deductions</small>
+          <small>{t("Before allowances and deductions")}</small>
         </div>
         <div className="payrollDonutArea">
           <div
@@ -643,48 +660,48 @@ function Overview() {
           >
             <div>
               <b>{ats.length}</b>
-              <span>attendance records</span>
+              <span>{t("attendance records")}</span>
             </div>
           </div>
           <small>
-            {pay > 0 ? "Payroll composition" : "No payroll recorded yet"}
+            {t(pay > 0 ? "Payroll composition" : "No payroll recorded yet")}
           </small>
         </div>
       </section>
       <div className="statsGrid">
         <Stat
-          label="Active workers"
+          label={t("Active workers")}
           value={workers.length}
-          description={`${scoped(state.sites).length} properties · ${state.companies.filter((c: any) => !companyId || c.id === companyId).length} companies`}
+          description={`${scoped(state.sites).length} ${t("properties")} · ${state.companies.filter((c: any) => !companyId || c.id === companyId).length} ${t("companies")}`}
           icon={Users}
         />
         <Stat
-          label="Payable working hours"
+          label={t("Payable working hours")}
           value={hours.toFixed(1)}
-          description={`${ot.toFixed(1)} overtime hours included`}
+          description={`${ot.toFixed(1)} ${t("overtime hours included")}`}
           icon={Clock3}
         />
         <Stat
-          label="Estimated wages"
+          label={t("Estimated wages")}
           value={money(pay)}
-          description="Regular pay + overtime, before adjustments"
+          description={t("Regular pay + overtime, before adjustments")}
           icon={Wallet}
         />
         <Stat
-          label="Needs your attention"
+          label={t("Needs your attention")}
           value={issues.length + drafts.length}
-          description={`${issues.length} attendance flags · ${drafts.length} payroll drafts`}
+          description={`${issues.length} ${t("attendance flags")} · ${drafts.length} ${t("payroll drafts")}`}
           icon={ClipboardCheck}
           tone="warm"
         />
       </div>
       <div className="dashboardGrid">
         <Card
-          title="Working hours at a glance"
-          description="A weekly view of this month’s payable hours"
+          title={t("Working hours at a glance")}
+          description={t("A weekly view of this month’s payable hours")}
           action={
             <span className="chartLegend">
-              <i /> Working hours
+              <i /> {t("Working hours")}
             </span>
           }
         >
@@ -693,35 +710,35 @@ function Overview() {
               <div key={i}>
                 <span>{v.toFixed(1)} h</span>
                 <i style={{ height: Math.max(4, (v / max) * 145) + "px" }} />
-                <small>Week {i + 1}</small>
+                <small>{t("Week")} {i + 1}</small>
               </div>
             ))}
           </div>
         </Card>
         <Card
-          title="Your payday checklist"
-          description="A simple path from attendance to payment"
+          title={t("Your payday checklist")}
+          description={t("A simple path from attendance to payment")}
         >
           <div className="checklist">
             {[
               [
                 "01",
                 "Set up your workforce",
-                `${state.companies.length} companies · ${state.workers.length} workers`,
+                `${state.companies.length} ${t("companies")} · ${state.workers.length} ${t("workers")}`,
                 "Companies & properties",
                 state.companies.length > 0,
               ],
               [
                 "02",
                 "Review attendance",
-                `${ats.length} shifts recorded this month`,
+                `${ats.length} ${t("shifts recorded this month")}`,
                 "Attendance records",
                 ats.length > 0,
               ],
               [
                 "03",
                 "Verify & finalize payroll",
-                `${drafts.length} drafts ready for review`,
+                `${drafts.length} ${t("drafts ready for review")}`,
                 "Payroll verification",
                 state.runs.some(
                   (r: any) => r.status === "Finalized" || r.status === "Paid",
@@ -733,7 +750,7 @@ function Overview() {
                   {done ? <Check size={17} /> : n}
                 </span>
                 <div>
-                  <b>{title}</b>
+                  <b>{t(String(title))}</b>
                   <small>{sub}</small>
                 </div>
                 <ChevronRight size={16} />
@@ -746,7 +763,7 @@ function Overview() {
         <div className="attentionStrip">
           <AlertTriangle size={21} />
           <div>
-            <b>A quick check before payday</b>
+            <b>{t("A quick check before payday")}</b>
             <p>
               {issues.length} attendance issue(s) need a closer look. Keep
               payroll accurate by reviewing them first.
@@ -756,16 +773,16 @@ function Overview() {
             variant="secondary"
             onClick={() => navigate("Error detection")}
           >
-            Review issues <ArrowRight size={15} />
+            {t("Review issues")} <ArrowRight size={15} />
           </Button>
         </div>
       )}
       <Card
-        title="Recent attendance"
-        description="Actual clock times, transparent calculations."
+        title={t("Recent attendance")}
+        description={t("Actual clock times, transparent calculations.")}
         action={
           <Button variant="text" onClick={() => navigate("Attendance records")}>
-            View register <ArrowUpRight size={15} />
+            {t("View register")} <ArrowUpRight size={15} />
           </Button>
         }
       >
@@ -778,9 +795,9 @@ function Overview() {
       {!state.companies.length && (
         <div className="gettingStarted">
           <div>
-            <b>Your workspace is ready for its first company.</b>
+            <b>{t("Your workspace is ready for its first company.")}</b>
             <p>
-              Start fresh, or explore all modules with fictional sample data.
+              {t("Start fresh, or explore all modules with fictional sample data.")}
             </p>
           </div>
           <div className="buttonRow">
@@ -789,10 +806,10 @@ function Overview() {
               disabled={busy}
               onClick={() => act("loadDemo", {}, "Sample workspace loaded")}
             >
-              Explore sample data
+              {t("Explore sample data")}
             </Button>
             <Button onClick={() => open("companies")}>
-              <Plus size={16} /> Add a company
+              <Plus size={16} /> {t("Add a company")}
             </Button>
           </div>
         </div>
