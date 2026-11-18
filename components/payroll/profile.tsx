@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import PasswordSettings from "./password";
 export type Profile = {
   email: string;
   displayName: string;
@@ -118,86 +119,89 @@ export function ProfileSettings({
       </section>
     );
   return (
-    <form className="profileSettings" onSubmit={save}>
-      <div className="profilePhotoRow">
-        <Avatar profile={draft} />
-        <div>
-          <h2>{t("Your profile")}</h2>
-          <p>{draft.email}</p>
+    <div className="accountSettingsGrid">
+      <form className="profileSettings" onSubmit={save}>
+        <div className="profilePhotoRow">
+          <Avatar profile={draft} />
+          <div>
+            <h2>{t("Your profile")}</h2>
+            <p>{draft.email}</p>
+          </div>
         </div>
-      </div>
-      <fieldset disabled={busy || processing}>
-        <label className="profileField">
-          {t("Profile picture")}
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(e) => {
-              void choosePhoto(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
-        </label>
-        <p className="profileHint">
-          {t("JPG, PNG or WebP, up to 5 MB. Photos are cropped to a square.")}
-        </p>
-        {draft.avatar && (
-          <button
-            className="btn secondary"
-            type="button"
-            onClick={() => setDraft({ ...draft, avatar: "" })}
-          >
-            {t("Remove photo")}
+        <fieldset disabled={busy || processing}>
+          <label className="profileField">
+            {t("Profile picture")}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => {
+                void choosePhoto(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          <p className="profileHint">
+            {t("JPG, PNG or WebP, up to 5 MB. Photos are cropped to a square.")}
+          </p>
+          {draft.avatar && (
+            <button
+              className="btn secondary"
+              type="button"
+              onClick={() => setDraft({ ...draft, avatar: "" })}
+            >
+              {t("Remove photo")}
+            </button>
+          )}
+          <label className="profileField">
+            {t("Display name")}
+            <input
+              required
+              maxLength={80}
+              autoComplete="nickname"
+              value={draft.displayName}
+              onChange={(e) =>
+                setDraft({ ...draft, displayName: e.target.value })
+              }
+            />
+          </label>
+          <label className="profileField">
+            {t("Dashboard language")}
+            <select
+              value={draft.language}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  language: e.target.value as Profile["language"],
+                })
+              }
+            >
+              <option value="en">English</option>
+              <option value="ms">Bahasa Melayu</option>
+            </select>
+          </label>
+          <p className="profileHint">
+            {t(
+              "Applies to dashboard and navigation. Detailed payroll forms and exports use English.",
+            )}
+          </p>
+          <button className="btn primary" type="submit">
+            {t(
+              busy
+                ? "Saving…"
+                : processing
+                  ? "Processing photo…"
+                  : "Save profile",
+            )}
           </button>
+        </fieldset>
+        {error && (
+          <p role="alert" className="errorBanner">
+            {error}
+          </p>
         )}
-        <label className="profileField">
-          {t("Display name")}
-          <input
-            required
-            maxLength={80}
-            autoComplete="nickname"
-            value={draft.displayName}
-            onChange={(e) =>
-              setDraft({ ...draft, displayName: e.target.value })
-            }
-          />
-        </label>
-        <label className="profileField">
-          {t("Dashboard language")}
-          <select
-            value={draft.language}
-            onChange={(e) =>
-              setDraft({
-                ...draft,
-                language: e.target.value as Profile["language"],
-              })
-            }
-          >
-            <option value="en">English</option>
-            <option value="ms">Bahasa Melayu</option>
-          </select>
-        </label>
-        <p className="profileHint">
-          {t(
-            "Applies to dashboard and navigation. Detailed payroll forms and exports use English.",
-          )}
-        </p>
-        <button className="btn primary" type="submit">
-          {t(
-            busy
-              ? "Saving…"
-              : processing
-                ? "Processing photo…"
-                : "Save profile",
-          )}
-        </button>
-      </fieldset>
-      {error && (
-        <p role="alert" className="errorBanner">
-          {error}
-        </p>
-      )}
-      {message && <p role="status">{message}</p>}
-    </form>
+        {message && <p role="status">{message}</p>}
+      </form>
+      <PasswordSettings language={profile?.language || "en"} />
+    </div>
   );
 }

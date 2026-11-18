@@ -3593,3 +3593,5 @@ tbody tr:hover {
 .profileHint { font-size:13px; color:#64748b; margin:8px 0 20px; line-height:1.6; }
 .profileSettings button:focus-visible,.profileHeaderButton:focus-visible,.profileAvatarButton:focus-visible { outline:3px solid #56a9cc; outline-offset:3px; }
 @media(max-width:640px) { .profileSettings { padding:20px; } .profileHeaderButton > span:last-child { display:none; } }
+
+.accountSettingsGrid{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}.accountSettingsGrid .profileSettings{width:100%;max-width:none;min-width:0}.passwordSettings h2{margin-bottom:12px}.passwordVisibility{display:flex;gap:9px;align-items:center;margin:18px 0}.passwordVisibility input{width:auto!important}.passwordSettings fieldset{min-width:0}@media(max-width:900px){.accountSettingsGrid{grid-template-columns:1fr}}
