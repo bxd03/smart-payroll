@@ -1,3 +1,4 @@
+import {GET as getSessions,POST as endSessions} from "../app/api/account/sessions/route";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -352,6 +353,19 @@ test("Netlify PostgreSQL migration, secure owner setup, sessions, imports and at
     ).status,
     200,
   );
+  const activeSession=changed.headers.get("set-cookie")!.split(";")[0];
+  const sessionReq=(value:string)=>new Request(origin+"/api/account/sessions",{headers:{cookie:value}});
+  assert.equal((await getSessions(sessionReq(""))).status,401);
+  const listing=await getSessions(sessionReq(activeSession));
+  const listed=await listing.json() as any;
+  assert.equal(listed.sessions.length,2);
+  assert.equal(listed.sessions.filter((s:any)=>s.current).length,1);
+  assert.equal(JSON.stringify(listed).includes("token_hash"),false);
+  assert.equal((await endSessions(req("/api/account/sessions",{password:"incorrect"},activeSession))).status,400);
+  assert.equal((await endSessions(new Request(origin+"/api/account/sessions",{method:"POST",headers:{origin:"https://evil.example",cookie:activeSession},body:"{}"}))).status,403);
+  assert.equal((await endSessions(req("/api/account/sessions",{password:"replacement-password!"},activeSession))).status,200);
+  assert.equal(((await (await getSessions(sessionReq(activeSession))).json()) as any).sessions.length,1);
+  assert.equal((await getSessions(sessionReq(session))).status,200);
   await signout(req("/signout", {}, session));
   assert.equal(
     (

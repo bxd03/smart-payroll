@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const a = await account(req);
     if (!a) return json({ error: "Please sign in again." }, 401);
     const raw = await req.text();
-    if (raw.length > 400000) return json({ error: "Photo is too large." }, 413);
+    if (raw.length > 2048) return json({ error: "Request too large." }, 413);
     const body = JSON.parse(raw);
     if (body.action === "password") {
       if (

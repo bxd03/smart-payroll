@@ -1,4 +1,8 @@
 const malay: Record<string, string> = {
+  "Account settings": "Tetapan akaun",
+  "Language preferences": "Pilihan bahasa",
+  "Manage your profile, password, sessions and language preferences.":
+    "Urus profil, kata laluan, sesi dan pilihan bahasa anda.",
   WORKSPACE: "RUANG KERJA",
   "ATTENDANCE & PAYROLL": "KEHADIRAN & GAJI",
   "INSIGHTS & SETTINGS": "LAPORAN & TETAPAN",

@@ -75,7 +75,8 @@ import {
   Table,
   Person,
 } from "../components/payroll/ui";
-import { Avatar, ProfileSettings, type Profile } from "../components/payroll/profile";
+import { Avatar, type Profile } from "../components/payroll/profile";
+import Settings from "../components/payroll/settings";
 import { translate } from "../lib/dashboard-language";
 const Ctx = createContext<any>(null);
 const useApp = () => useContext(Ctx);
@@ -107,7 +108,7 @@ const groups = [
       ["Error detection", AlertTriangle],
       ["Attendance policies", SlidersHorizontal],
       ["Audit trail", ShieldCheck],
-      ["My profile", Users],
+      ["Account settings", Users],
     ],
   },
 ];
@@ -144,17 +145,23 @@ const desc: any = {
 };
 export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [profileError, setProfileError] = useState('');
+  const [profileError, setProfileError] = useState("");
   const [profileLoading, setProfileLoading] = useState(true);
-  const t = (text: string) => translate(profile?.language || 'en', text);
+  const t = (text: string) => translate(profile?.language || "en", text);
   useEffect(() => {
-    fetch('/api/profile', { cache: 'no-store' }).then(async response => {
-      if (response.status === 401) return;
-      if (!response.ok) throw Error('Unable to load your profile. Reload to try again.');
-      setProfile(await response.json());
-    }).catch(error => setProfileError(error.message)).finally(() => setProfileLoading(false));
+    fetch("/api/profile", { cache: "no-store" })
+      .then(async (response) => {
+        if (response.status === 401) return;
+        if (!response.ok)
+          throw Error("Unable to load your profile. Reload to try again.");
+        setProfile(await response.json());
+      })
+      .catch((error) => setProfileError(error.message))
+      .finally(() => setProfileLoading(false));
   }, []);
-  useEffect(() => { document.documentElement.lang = profile?.language || 'en'; }, [profile?.language]);
+  useEffect(() => {
+    document.documentElement.lang = profile?.language || "en";
+  }, [profile?.language]);
   const [state, setState] = useState<Workspace>(emptyWorkspace),
     [revision, setRevision] = useState(0),
     [files, setFiles] = useState<any[]>([]),
@@ -358,11 +365,20 @@ export default function App() {
               </div>
             </div>
             <div className="profile">
-              <button type="button" className="profileAvatarButton" aria-label={t("My profile")} onClick={() => navigate("My profile")}><Avatar profile={profile} /></button>
+              <button
+                type="button"
+                className="profileAvatarButton"
+                aria-label={t("Account settings")}
+                onClick={() => navigate("Account settings")}
+              >
+                <Avatar profile={profile} />
+              </button>
               <div>
                 <b>{profile?.displayName || workspace.name}</b>
                 <small>
-                  {t(workspace.signedIn ? "Signed in" : "Saved for this browser")}
+                  {t(
+                    workspace.signedIn ? "Signed in" : "Saved for this browser",
+                  )}
                 </small>
               </div>
               {workspace.signedIn ? (
@@ -413,7 +429,15 @@ export default function App() {
               >
                 <RefreshCw size={16} />
               </button>
-              <button type="button" className="profileHeaderButton" onClick={() => navigate("My profile")} aria-label={t("My profile")}><Avatar profile={profile} /><span>{profile?.displayName || t("My profile")}</span></button>
+              <button
+                type="button"
+                className="profileHeaderButton"
+                onClick={() => navigate("Account settings")}
+                aria-label={t("Account settings")}
+              >
+                <Avatar profile={profile} />
+                <span>{profile?.displayName || t("Account settings")}</span>
+              </button>
             </div>
           </header>
           <div className="content">
@@ -426,7 +450,13 @@ export default function App() {
                     : "TEMPORARY WORKFORCE MANAGEMENT"}
                 </div>
                 <h1>{t(page === "Overview" ? "Payroll dashboard" : page)}</h1>
-                <p>{t(page === "My profile" ? "Personalise your name, photo and dashboard language." : desc[page] || "")}</p>
+                <p>
+                  {t(
+                    page === "Account settings"
+                      ? "Manage your profile, password, sessions and language preferences."
+                      : desc[page] || "",
+                  )}
+                </p>
               </div>
               <div className="filters">
                 <label className="companyFilter">
@@ -530,7 +560,14 @@ export default function App() {
               </Card>
             ) : (
               <>
-                {page === "My profile" && (profileLoading ? <p role="status">Loading profile…</p> : profileError ? <p role="alert">{profileError}</p> : <ProfileSettings profile={profile} onSave={setProfile} t={t} />)}
+                {page === "Account settings" &&
+                  (profileLoading ? (
+                    <p role="status">Loading profile…</p>
+                  ) : profileError ? (
+                    <p role="alert">{profileError}</p>
+                  ) : (
+                    <Settings profile={profile} onSave={setProfile} t={t} />
+                  ))}
                 {page === "Overview" && <Overview />}
                 {page === "All workspaces" && workspace.isSuperadmin && (
                   <AllWorkspaces />
@@ -616,7 +653,9 @@ function Overview() {
         <div className="summaryTotal">
           <span className="summaryLabel">{t("ESTIMATED PAYROLL")}</span>
           <strong>{money(pay)}</strong>
-          <p>{t("Recorded attendance")} · {month}</p>
+          <p>
+            {t("Recorded attendance")} · {month}
+          </p>
           <Button onClick={() => navigate("Payroll calculator")}>
             <Plus size={15} /> {t("New payroll run")}
           </Button>
@@ -710,7 +749,9 @@ function Overview() {
               <div key={i}>
                 <span>{v.toFixed(1)} h</span>
                 <i style={{ height: Math.max(4, (v / max) * 145) + "px" }} />
-                <small>{t("Week")} {i + 1}</small>
+                <small>
+                  {t("Week")} {i + 1}
+                </small>
               </div>
             ))}
           </div>
@@ -797,7 +838,9 @@ function Overview() {
           <div>
             <b>{t("Your workspace is ready for its first company.")}</b>
             <p>
-              {t("Start fresh, or explore all modules with fictional sample data.")}
+              {t(
+                "Start fresh, or explore all modules with fictional sample data.",
+              )}
             </p>
           </div>
           <div className="buttonRow">
